@@ -1,7 +1,7 @@
+package mivalgamer.app;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-
 public class Plataforma {
     private final long idPlataforma;
     private final String nombreComercial;
