@@ -1,3 +1,4 @@
+package mivalgamer.app;
 public class ItemCarrito {
     private final Long idItem;
     private final Videojuego videojuego;

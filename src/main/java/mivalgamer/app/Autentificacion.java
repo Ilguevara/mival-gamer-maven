@@ -1,6 +1,4 @@
-
-// Archivo: proyecto/Autentificacion.java
-
+package mivalgamer.app;
 import java.sql.*;
 import java.util.UUID;
 import java.util.logging.Logger;

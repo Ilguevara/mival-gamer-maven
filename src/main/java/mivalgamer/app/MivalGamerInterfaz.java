@@ -1,3 +1,4 @@
+package mivalgamer.app;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -7,8 +8,8 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import proyecto.Controllers.RegisterController;
-import proyecto.Controllers.LoginController;
+import mivalgamer.app.Controllers.LoginController;
+import  mivalgamer.app.Controllers.RegisterController;
 
 public class MivalGamerInterfaz extends Application {
 

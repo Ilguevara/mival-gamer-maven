@@ -1,3 +1,4 @@
+package mivalgamer.app;
 import java.util.List;
 
 public enum EstadoVideojuego {

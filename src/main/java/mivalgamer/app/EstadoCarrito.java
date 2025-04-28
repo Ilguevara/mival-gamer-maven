@@ -1,3 +1,4 @@
+package mivalgamer.app;
 public enum EstadoCarrito {
     ACTIVO,
     FINALIZADO,
