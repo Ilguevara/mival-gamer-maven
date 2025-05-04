@@ -1,4 +1,5 @@
 package mivalgamer.app;
+
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,9 +23,17 @@ public class Biblioteca {
             this.keyActivacion = keyActivacion;
         }
 
-        public Videojuego getJuego() { return juego; }
-        public LocalDateTime getFechaCompra() { return fechaCompra; }
-        public String getKeyActivacion() { return keyActivacion; }
+        public Videojuego getJuego() {
+            return juego;
+        }
+
+        public LocalDateTime getFechaCompra() {
+            return fechaCompra;
+        }
+
+        public String getKeyActivacion() {
+            return keyActivacion;
+        }
     }
 
     public Biblioteca(Usuario usuario, Connection connection) {
@@ -35,7 +44,6 @@ public class Biblioteca {
         this.connection = connection;
     }
 
-    // Método renombrado de getItemsBiblioteca() a getJuegos() para resolver el primer error
     public List<ItemBiblioteca> getJuegos() {
         List<ItemBiblioteca> items = new ArrayList<>();
         String sql = "SELECT v.*, b.fecha_compra, b.key_activacion FROM biblioteca b " +
@@ -61,7 +69,7 @@ public class Biblioteca {
 
     public void mostrarBiblioteca() {
         try {
-            List<ItemBiblioteca> items = getJuegos(); // Usamos el método renombrado
+            List<ItemBiblioteca> items = getJuegos();
 
             System.out.println("\n=== TU BIBLIOTECA DE JUEGOS ===");
             System.out.printf("Total de juegos: %d%n%n", items.size());
@@ -79,20 +87,59 @@ public class Biblioteca {
                             item.getFechaCompra().toLocalDate());
                 }
             }
-        } catch (Exception e) { // Cambiado a Exception para resolver el segundo error
+        } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error al mostrar biblioteca", e);
             System.out.println("\nError al cargar la biblioteca: " + e.getMessage());
         }
     }
 
-    public static void mostrarMenuBiblioteca() {
-        if (Proyecto.usuarioActual == null) {
-            System.out.println("No hay usuario autenticado");
+    public void agregarJuego(Videojuego juego, String keyActivacion) {
+        if (juego == null || keyActivacion == null || keyActivacion.isEmpty()) {
+            throw new IllegalArgumentException("Juego y key de activación no pueden ser nulos");
+        }
+
+        if (contieneJuego(juego)) {
+            LOGGER.warning("El juego " + juego.getTitulo() + " ya está en la biblioteca");
             return;
         }
 
-        Biblioteca biblioteca = Proyecto.usuarioActual.getBiblioteca();
-        biblioteca.mostrarBiblioteca();
+        String sql = "INSERT INTO biblioteca (id_usuario, id_videojuego, fecha_compra, key_activacion) " +
+                "VALUES (?, ?, NOW(), ?)";
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, usuario.getIdUsuario());
+            stmt.setLong(2, juego.getIdVideojuego());
+            stmt.setString(3, keyActivacion);
+            stmt.executeUpdate();
+
+            LOGGER.info("Juego " + juego.getTitulo() + " agregado a la biblioteca");
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "Error al agregar juego a la biblioteca", ex);
+            throw new RuntimeException("Error al agregar juego a la biblioteca", ex);
+        }
+    }
+
+    public List<ItemBiblioteca> getJuegosRecientes(int limite) {
+        List<ItemBiblioteca> items = new ArrayList<>();
+        String sql = "SELECT v.*, b.fecha_compra, b.key_activacion FROM biblioteca b " +
+                "JOIN videojuego v ON b.id_videojuego = v.id_videojuego " +
+                "WHERE b.id_usuario = ? ORDER BY b.fecha_compra DESC LIMIT ?";
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, usuario.getIdUsuario());
+            stmt.setInt(2, limite);
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Videojuego juego = mapVideojuegoFromResultSet(rs);
+                LocalDateTime fechaCompra = rs.getTimestamp("fecha_compra").toLocalDateTime();
+                String keyActivacion = rs.getString("key_activacion");
+                items.add(new ItemBiblioteca(juego, fechaCompra, keyActivacion));
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "Error al obtener juegos recientes", ex);
+        }
+        return items;
     }
 
     private String obtenerNombrePlataforma(long idPlataforma) {
@@ -118,25 +165,6 @@ public class Biblioteca {
                 rs.getDouble("precio"),
                 EstadoVideojuego.fromString(rs.getString("estado"))
         );
-    }
-
-    public void agregarJuego(Videojuego juego, String keyActivacion) {
-        if (juego == null || keyActivacion == null || keyActivacion.isEmpty()) {
-            throw new IllegalArgumentException("Juego y key de activación no pueden ser nulos");
-        }
-
-        String sql = "INSERT INTO biblioteca (id_usuario, id_videojuego, fecha_compra, key_activacion) " +
-                "VALUES (?, ?, CURDATE(), ?)";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, usuario.getIdUsuario());
-            stmt.setLong(2, juego.getIdVideojuego());
-            stmt.setString(3, keyActivacion);
-            stmt.executeUpdate();
-        } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "Error al agregar juego a la biblioteca", ex);
-            throw new RuntimeException("Error al agregar juego a la biblioteca", ex);
-        }
     }
 
     public boolean contieneJuego(Videojuego juego) {

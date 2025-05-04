@@ -1,4 +1,5 @@
 package mivalgamer.app;
+
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -8,7 +9,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Pedido {
-    private Connection connection;
+    private static final Logger LOGGER = Logger.getLogger(Pedido.class.getName());
+
     private final String idPedido;
     private final Usuario usuario;
     private final LocalDateTime fechaCreacion;
@@ -17,14 +19,11 @@ public class Pedido {
     private final double impuestos;
     private EstadoPedido estado;
     private List<ItemPedido> items;
+    private final Connection connection;
 
-    public void setItems(List<ItemPedido> items) {
-        this.items = items;
-    }
     // Constructor principal
     public Pedido(String idPedido, Usuario usuario, LocalDateTime fechaCreacion, int metodoPagoId,
-                  double descuentoTotal, double impuestos,
-                  EstadoPedido estado, Connection connection) {
+                  double descuentoTotal, double impuestos, EstadoPedido estado, Connection connection) {
         this.idPedido = idPedido;
         this.usuario = usuario;
         this.fechaCreacion = fechaCreacion;
@@ -38,52 +37,33 @@ public class Pedido {
     // Constructor alternativo para nuevos pedidos
     public Pedido(Usuario usuario, int metodoPagoId,
                   double descuentoTotal, double impuestos, Connection connection) {
-        this(
-                "PED-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(),
-                usuario,
-                LocalDateTime.now(),
-                metodoPagoId,
-                descuentoTotal,
-                impuestos,
-                EstadoPedido.PENDIENTE,
-                connection
-        );
+        this(generarIdPedido(), usuario, LocalDateTime.now(), metodoPagoId,
+                descuentoTotal, impuestos, EstadoPedido.PENDIENTE, connection);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Pedido.class.getName());
-
 
     private static String generarIdPedido() {
         return "PED-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
+    public void setItems(List<ItemPedido> items) {
+        this.items = items;
+    }
+
     public void guardarEnBD() throws SQLException {
-        // Verificar si la conexión tiene el auto-commit activado antes de manipularlo
         boolean autoCommitOriginal = connection.getAutoCommit();
 
         try {
-            // Desactivar auto-commit para usar transacciones manuales
             connection.setAutoCommit(false);
-
-            // Asegurarse de que el auto-commit se mantenga desactivado durante la transacción
-            System.out.println("Estado de autoCommit antes de commit: " + connection.getAutoCommit());
-
-            // Guardar el pedido y los items en la base de datos
             guardarPedidoEnBD();
             guardarItemsPedido();
-
-            // Si todo ha ido bien, hacer commit a la transacción
             connection.commit();
             LOGGER.log(Level.INFO, "Pedido guardado correctamente en la base de datos.");
         } catch (SQLException e) {
-            // Si ocurre un error, hacer rollback de la transacción
             connection.rollback();
             LOGGER.log(Level.SEVERE, "Error al guardar el pedido, se ha hecho rollback.", e);
-            throw e; // Propagar la excepción para que sea manejada en el controlador
+            throw e;
         } finally {
-            // Restaurar el auto-commit al valor original después de la transacción
             connection.setAutoCommit(autoCommitOriginal);
-            System.out.println("Estado de autoCommit después de finalizar la transacción: " + connection.getAutoCommit());
         }
     }
 
@@ -156,18 +136,32 @@ public class Pedido {
             return;
         }
 
-        String sql = "INSERT INTO biblioteca (id_usuario, id_videojuego, fecha_compra) " +
-                "VALUES (?, ?, ?)";
+        Biblioteca biblioteca = new Biblioteca(usuario, connection);
+        String sql = "INSERT INTO biblioteca (id_usuario, id_videojuego, fecha_compra, key_activacion) " +
+                "VALUES (?, ?, ?, ?)";
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             for (ItemPedido item : items) {
-                stmt.setString(1, usuario.getIdUsuario());
-                stmt.setLong(2, item.getJuego().getIdVideojuego());
-                stmt.setDate(3, Date.valueOf(fechaCreacion.toLocalDate()));
-                stmt.addBatch();
+                if (!biblioteca.contieneJuego(item.getJuego())) {
+                    String keyActivacion = generarKeyActivacion(item.getJuego());
+
+                    stmt.setString(1, usuario.getIdUsuario());
+                    stmt.setLong(2, item.getJuego().getIdVideojuego());
+                    stmt.setTimestamp(3, Timestamp.valueOf(fechaCreacion));
+                    stmt.setString(4, keyActivacion);
+                    stmt.addBatch();
+
+                    LOGGER.info("Juego " + item.getJuego().getTitulo() + " agregado a biblioteca");
+                } else {
+                    LOGGER.info("Juego " + item.getJuego().getTitulo() + " ya está en la biblioteca");
+                }
             }
             stmt.executeBatch();
         }
+    }
+
+    private String generarKeyActivacion(Videojuego juego) {
+        return "KEY-" + idPedido + "-" + juego.getIdVideojuego() + "-" + System.currentTimeMillis();
     }
 
     public List<ItemPedido> getItems() throws SQLException {
