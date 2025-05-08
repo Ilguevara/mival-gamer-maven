@@ -1,32 +1,32 @@
 package mivalgamer.app;
+
+import java.sql.SQLException;
+import java.util.List;
+
 public class ItemCarrito {
-    private final Long idItem;
     private final Videojuego videojuego;
     private int cantidad;
-    private final CarritoCompra carrito;
+    private final double precioUnitario;
 
-    public ItemCarrito(Long idItem, Videojuego videojuego, int cantidad, CarritoCompra carrito) {
-        if (idItem == null) {
-            throw new IllegalArgumentException("ID de ítem no puede ser nulo");
-        }
+    // Constructor principal
+    public ItemCarrito(Videojuego videojuego, int cantidad, double precioUnitario) {
         if (videojuego == null) {
             throw new IllegalArgumentException("Videojuego no puede ser nulo");
-        }
-        if (carrito == null) {
-            throw new IllegalArgumentException("Carrito no puede ser nulo");
         }
         if (cantidad <= 0) {
             throw new IllegalArgumentException("Cantidad debe ser positiva");
         }
-
-        this.idItem = idItem;
         this.videojuego = videojuego;
         this.cantidad = cantidad;
-        this.carrito = carrito;
+        this.precioUnitario = precioUnitario;
     }
 
     public double calcularSubtotal() {
-        return videojuego.getPrecio() * cantidad;
+        return precioUnitario * cantidad;
+    }
+
+    public double getSubtotal() {
+        return calcularSubtotal();
     }
 
     public void actualizarCantidad(int nuevaCantidad) {
@@ -36,23 +36,43 @@ public class ItemCarrito {
         this.cantidad = nuevaCantidad;
     }
 
-    // Getters
-    public Long getIdItem() { return idItem; }
-    public Videojuego getVideojuego() { return videojuego; }
-    public int getCantidad() { return cantidad; }
-    public CarritoCompra getCarrito() { return carrito; }
-    public double getSubtotal() { return calcularSubtotal(); }
+    // Nuevo método para obtener el precio unitario (necesario para CarritoCompra)
+    public double getPrecioUnitario() {
+        return precioUnitario;
+    }
+
+    // Getter del videojuego
+    public Videojuego getVideojuego() {
+        return videojuego;
+    }
+
+    public int getCantidad() {
+        return cantidad;
+    }
+
+    public String obtenerNombresPlataformas(java.sql.Connection connection) {
+        try {
+            List<Plataforma> plataformas = videojuego.obtenerPlataformas(connection);
+            if (plataformas == null || plataformas.isEmpty()) {
+                return "Plataformas desconocidas";
+            }
+            return plataformas.stream()
+                    .map(Plataforma::getNombreComercial)
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse("Plataformas desconocidas");
+        } catch (Exception ex) {
+            return "Plataformas desconocidas";
+        }
+    }
+
+
 
     @Override
     public String toString() {
-        // Opción 1: Mostrando solo el ID de plataforma
-        return String.format("%s (Plataforma ID: %d) - %d x $%.2f = $%.2f",
+        return String.format("%s - %d x $%.2f = $%.2f",
                 videojuego.getTitulo(),
-                videojuego.getIdPlataforma(),
                 cantidad,
-                videojuego.getPrecio(),
-                getSubtotal());
-
-
+                precioUnitario,
+                calcularSubtotal());
     }
 }

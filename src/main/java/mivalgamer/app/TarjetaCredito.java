@@ -1,17 +1,23 @@
 package mivalgamer.app;
 import java.sql.*;
+import java.time.LocalDate;
 
 public class TarjetaCredito extends MetodoPago {
     private final double limiteCredito;
 
-    // Constructor para crear nueva tarjeta
+    /**
+     * Constructor para crear nueva tarjeta de crédito.
+     * Valida el número y la fecha de expiración.
+     */
     public TarjetaCredito(Connection connection, String titular, String numero,
                           Date fechaExpiracion, String cvv, double limiteCredito) {
-        super(connection, titular, numero, fechaExpiracion, cvv, TipoMetodoPago.CREDITO);
+        super(connection, titular, validarNumeroTarjeta(numero), validarFechaExpiracion(fechaExpiracion), cvv, TipoMetodoPago.CREDITO);
         this.limiteCredito = limiteCredito;
     }
 
-    // Constructor para cargar desde BD
+    /**
+     * Constructor para cargar desde la BD.
+     */
     public TarjetaCredito(Connection connection, ResultSet rs) throws SQLException {
         super(connection,
                 rs.getString("titular"),
@@ -42,5 +48,34 @@ public class TarjetaCredito extends MetodoPago {
 
     public double getLimiteCredito() { return limiteCredito; }
 
+    /**
+     * Valida que el número de la tarjeta sea exactamente de 10 dígitos numéricos.
+     */
+    private static String validarNumeroTarjeta(String numero) {
+        if (numero == null || !numero.matches("\\d{10}")) {
+            throw new IllegalArgumentException("Introduce una tarjeta valida (10 dígitos numéricos)");
+        }
+        return numero;
+    }
 
+    /**
+     * Valida que la fecha sea válida y no haya caducado.
+     */
+    private static Date validarFechaExpiracion(Date fechaExpiracion) {
+        if (fechaExpiracion == null) {
+            throw new IllegalArgumentException("Por favor ingrese una tarjeta valida");
+        }
+        LocalDate fecha = fechaExpiracion.toLocalDate();
+        LocalDate hoy = LocalDate.now();
+        int mes = fecha.getMonthValue();
+        int anio = fecha.getYear();
+
+        if (mes < 1 || mes > 12) {
+            throw new IllegalArgumentException("Mes de expiración inválido");
+        }
+        if (fecha.isBefore(hoy)) {
+            throw new IllegalArgumentException("Tarjeta caducada");
+        }
+        return fechaExpiracion;
+    }
 }

@@ -1,5 +1,7 @@
 package mivalgamer.app;
 import java.sql.*;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Level;
@@ -209,20 +211,98 @@ public class Proyecto {
         }
     }
 
+
+
     private static void mostrarCatalogoCompleto() {
         try {
             List<Videojuego> juegos = Videojuego.obtenerTodos(connection);
-            System.out.println("\n=== CATALOGO COMPLETO ===");
-            mostrarListaJuegos(juegos);
+            for (Videojuego juego : juegos) {
+                // Obtener todas las plataformas del videojuego
+                List<Plataforma> plataformas = Plataforma.obtenerPorVideojuego(connection, juego.getIdVideojuego());
+                System.out.print(juego.getTitulo() + " | Plataformas: ");
+                for (int i = 0; i < plataformas.size(); i++) {
+                    System.out.print(plataformas.get(i).getNombreComercial());
+                    if (i < plataformas.size() - 1) {
+                        System.out.print(", ");
+                    }
+                }
+                // Aquí agregamos el estado a la impresión
+                System.out.print(" | Estado: ");
+                if (juego.getEstado() != null) {
+                    System.out.print(juego.getEstado().name());
+                } else {
+                    System.out.print("Desconocido");
+                }
+                // También puedes incluir precio si lo necesitas
+                System.out.printf(" | Precio: $%.2f", juego.getPrecio());
+                System.out.println();
+            }
 
-            System.out.print("\nSeleccione un juego para agregar al carrito (0 para volver): ");
+            System.out.println("\nSelecciona un juego para ver detalles (0 para volver): ");
             int seleccion = leerEntero();
+            scanner.nextLine();
+
             if (seleccion > 0 && seleccion <= juegos.size()) {
-                agregarAlCarrito(juegos.get(seleccion - 1));
+                mostrarDetallesJuego(juegos.get(seleccion - 1));
+            }
+
+
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "Error mostrando catálogo", ex);
+        }
+    }
+
+    private static void mostrarDetallesJuego(Videojuego juego) throws SQLException {
+        // Obtener género
+        String nombreGenero = "";
+        try {
+            // Consulta para obtener el nombre del género
+            String sqlGenero = "SELECT nombre FROM genero WHERE id_genero = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sqlGenero)) {
+                stmt.setLong(1, juego.getIdGenero());
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        nombreGenero = rs.getString("nombre");
+                    }
+                }
             }
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Error al obtener catalogo", e);
-            System.out.println("Error al cargar el catalogo");
+            nombreGenero = "Desconocido";
+            LOGGER.log(Level.WARNING, "Error al obtener género del juego", e);
+        }
+
+        // Obtener plataformas
+        List<Plataforma> plataformas = juego.obtenerPlataformas(connection);
+        StringBuilder plataformasStr = new StringBuilder();
+        for (int i = 0; i < plataformas.size(); i++) {
+            plataformasStr.append(plataformas.get(i).getNombreComercial());
+            if (i < plataformas.size() - 1) {
+                plataformasStr.append(", ");
+            }
+        }
+
+        // Mostrar detalles
+        System.out.println("\nDETALLES DEL JUEGO");
+        System.out.println("=============================");
+        System.out.println("Título: " + juego.getTitulo());
+        System.out.println("Género: " + nombreGenero);
+        System.out.println("Plataforma: " + plataformasStr);
+        System.out.println("Precio: $" + String.format("%.2f", juego.getPrecio()) + " USD");
+        System.out.println("Estudio: " + juego.getEstudio());
+        System.out.println("Estado: " + juego.getEstado());
+
+        System.out.println("\nDescripción:");
+        System.out.println(juego.getDescripcion());
+
+        System.out.println("\n1. Agregar al carrito");
+        System.out.println("0. Volver");
+        System.out.print("Seleccione una opción: ");
+
+        int opcion = leerEntero();
+        scanner.nextLine();
+
+        if (opcion == 1) {
+            agregarAlCarrito(juego);
         }
     }
 
@@ -243,10 +323,27 @@ public class Proyecto {
                 System.out.println("\n=== JUEGOS DISPONIBLES ===");
                 mostrarListaJuegos(juegos);
 
-                System.out.print("\nSeleccione un juego para agregar al carrito (0 para volver): ");
-                int juegoSeleccionado = leerEntero();
-                if (juegoSeleccionado > 0 && juegoSeleccionado <= juegos.size()) {
-                    agregarAlCarrito(juegos.get(juegoSeleccionado - 1));
+                System.out.println("\n1. Seleccionar juego para ver detalles");
+                System.out.println("2. Seleccionar juego para agregar al carrito");
+                System.out.println("0. Volver");
+                System.out.print("Seleccione una opción: ");
+                int opcion = leerEntero();
+                scanner.nextLine();
+
+                if (opcion == 1) {
+                    System.out.print("\nSeleccione un juego para ver detalles (0 para volver): ");
+                    int juegoSeleccionado = leerEntero();
+                    scanner.nextLine();
+                    if (juegoSeleccionado > 0 && juegoSeleccionado <= juegos.size()) {
+                        mostrarDetallesJuego(juegos.get(juegoSeleccionado - 1));
+                    }
+                } else if (opcion == 2) {
+                    System.out.print("\nSeleccione un juego para agregar al carrito (0 para volver): ");
+                    int juegoSeleccionado = leerEntero();
+                    scanner.nextLine();
+                    if (juegoSeleccionado > 0 && juegoSeleccionado <= juegos.size()) {
+                        agregarAlCarrito(juegos.get(juegoSeleccionado - 1));
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -261,22 +358,48 @@ public class Proyecto {
             System.out.println("\n=== JUEGOS EN DESCUENTO ===");
             mostrarListaJuegos(juegos);
 
-            System.out.print("\nSeleccione un juego para agregar al carrito (0 para volver): ");
-            int seleccion = leerEntero();
-            if (seleccion > 0 && seleccion <= juegos.size()) {
-                agregarAlCarrito(juegos.get(seleccion - 1));
+            System.out.println("\n1. Seleccionar juego para ver detalles");
+            System.out.println("2. Seleccionar juego para agregar al carrito");
+            System.out.println("0. Volver");
+            System.out.print("Seleccione una opción: ");
+            int opcion = leerEntero();
+            scanner.nextLine();
+
+            if (opcion == 1) {
+                System.out.print("\nSeleccione un juego para ver detalles (0 para volver): ");
+                int seleccion = leerEntero();
+                scanner.nextLine();
+                if (seleccion > 0 && seleccion <= juegos.size()) {
+                    mostrarDetallesJuego(juegos.get(seleccion - 1));
+                }
+            } else if (opcion == 2) {
+                System.out.print("\nSeleccione un juego para agregar al carrito (0 para volver): ");
+                int seleccion = leerEntero();
+                scanner.nextLine();
+                if (seleccion > 0 && seleccion <= juegos.size()) {
+                    agregarAlCarrito(juegos.get(seleccion - 1));
+                }
             }
         } catch (SQLException e) {
+
             LOGGER.log(Level.SEVERE, "Error al obtener juegos en descuento", e);
             System.out.println("Error al cargar los juegos en descuento");
         }
     }
 
     private static void mostrarListaJuegos(List<Videojuego> juegos) {
-        for (int i = 0; i < juegos.size(); i++) {
-            Videojuego juego = juegos.get(i);
-            System.out.printf("%d. %s - %s - $%.2f%n",
-                    i + 1, juego.getTitulo(), juego.getEstudio(), juego.getPrecio());
+        int i = 1;
+        for (Videojuego juego : juegos) {
+            // Ejemplo de cómo mostrar título, plataformas y estado
+            try {
+                List<Plataforma> plataformas = juego.obtenerPlataformas(connection);
+                String plataformasStr = plataformas.isEmpty() ? "Sin plataformas" :
+                        plataformas.stream().map(Plataforma::getNombreComercial).reduce((a,b) -> a + ", " + b).orElse("");
+                System.out.printf("%d) %s | Plataformas: %s | Estado: %s | Precio: $%.2f\n",
+                        i++, juego.getTitulo(), plataformasStr, juego.getEstado().name(), juego.getPrecio());
+            } catch (SQLException e) {
+                System.out.println(i++ + ") " + juego.getTitulo() + " (Error cargando plataformas)");
+            }
         }
     }
 
@@ -441,6 +564,8 @@ public class Proyecto {
         }
     }
 
+
+
     private static void agregarMetodoPago() {
         System.out.println("\n=== AGREGAR METODO DE PAGO ===");
         System.out.println("1. Tarjeta de debito");
@@ -457,25 +582,68 @@ public class Proyecto {
         System.out.print("Nombre del titular: ");
         String titular = scanner.nextLine();
 
-        System.out.print("Numero de tarjeta: ");
-        String numero = scanner.nextLine();
+        // Validación inmediata para número de tarjeta
+        String numero;
+        while (true) {
+            System.out.print("Numero de tarjeta: ");
+            numero = scanner.nextLine();
+            if (numero.matches("\\d{10}")) {
+                break;
+            } else {
+                System.out.println("El número de tarjeta debe tener exactamente 10 dígitos numéricos.");
+            }
+        }
 
-        System.out.print("Fecha de expiracion (YYYY-MM-DD): ");
-        Date fechaExpiracion = Date.valueOf(scanner.nextLine());
+        // Validación inmediata para fecha de expiración (no pasada)
+        Date fechaExpiracion;
+        while (true) {
+            System.out.print("Fecha de expiracion (YYYY-MM-DD): ");
+            String fechaInput = scanner.nextLine();
+            try {
+                fechaExpiracion = Date.valueOf(fechaInput);
+                LocalDate fechaIngresada = fechaExpiracion.toLocalDate();
+                if (fechaIngresada.isAfter(LocalDate.now())) {
+                    break;
+                } else {
+                    System.out.println("Tarjeta expirada.");
+                }
+            } catch (IllegalArgumentException e) {
+                System.out.println("Formato de fecha inválido. Intente de nuevo (YYYY-MM-DD).");
+            }
+        }
 
-        System.out.print("CVV: ");
-        String cvv = scanner.nextLine();
+        // Validación inmediata para CVV
+        String cvv;
+        while (true) {
+            System.out.print("CVV: ");
+            cvv = scanner.nextLine();
+            if (cvv.matches("\\d{3,4}")) {
+                break;
+            } else {
+                System.out.println("CVV no valido.");
+            }
+        }
 
         try {
-            MetodoPago metodo;
+            MetodoPago metodo = null;
             if (tipo == 1) {
-                System.out.print("Numero de cuenta: ");
-                String numeroCuenta = scanner.nextLine();
-                metodo = new TarjetaDebito(connection, titular, numero, fechaExpiracion, cvv, numeroCuenta);
+                // Si decides pedir el número de cuenta para débito, agrégalo aquí si hace falta
+                metodo = new TarjetaDebito(connection, titular, numero, fechaExpiracion, cvv);
             } else {
-                System.out.print("Limite de credito: ");
-                double limite = scanner.nextDouble();
-                scanner.nextLine();
+                double limite;
+                while (true) {
+                    System.out.print("Limite de credito: ");
+                    try {
+                        limite = Double.parseDouble(scanner.nextLine());
+                        if (limite > 0) {
+                            break;
+                        } else {
+                            System.out.println("El límite debe ser un número positivo.");
+                        }
+                    } catch (NumberFormatException ex) {
+                        System.out.println("Ingrese un valor numérico válido para el límite.");
+                    }
+                }
                 metodo = new TarjetaCredito(connection, titular, numero, fechaExpiracion, cvv, limite);
             }
 
@@ -491,11 +659,8 @@ public class Proyecto {
 
         } catch (SQLException e) {
             System.out.println("Error al guardar metodo de pago: " + e.getMessage());
-        } catch (IllegalArgumentException e) {
-            System.out.println("Error en formato de fecha: " + e.getMessage());
         }
     }
-
     private static void finalizarCompra(CarritoCompra carrito) {
         try {
             List<MetodoPago> metodos = usuarioActual.getMetodosPago();
@@ -535,18 +700,37 @@ public class Proyecto {
 
             int metodoPagoId = metodos.get(seleccion - 1).getIdMetodo();
 
-            System.out.print("\nTienes un codigo de descuento? (deja vacio si no): ");
-            String codigoDescuento = scanner.nextLine();
-            if (codigoDescuento.isEmpty()) codigoDescuento = null;
+            // Aquí ya no se pregunta ni se usa el código de descuento
 
             Pedido pedido = PedidoFactory.crearPedidoDesdeCarrito(
                     connection,
                     carrito.getItems(),
                     metodoPagoId,
-                    codigoDescuento,
+                    null,  // El parámetro del código de descuento se pone null si es necesario
                     usuarioActual);
 
             System.out.println("Pedido creado exitosamente con ID: " + pedido.getIdPedido());
+            System.out.println("\n¡Gracias por tu compra! Aquí tienes las claves de activación de tus juegos:");
+            int index = 1;
+            for (ItemPedido item : pedido.getItems()) {
+                String key = "";
+                try (PreparedStatement stmt = connection.prepareStatement(
+                        "SELECT key_activacion FROM biblioteca WHERE id_usuario = ? AND id_videojuego = ?")) {
+                    stmt.setString(1, usuarioActual.getIdUsuario());
+                    stmt.setLong(2, item.getJuego().getIdVideojuego());
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            key = rs.getString("key_activacion");
+                        } else {
+                            key = "(No se encontró la clave de activación)";
+                        }
+                    }
+                } catch (SQLException ex) {
+                    key = "(Error al obtener la clave)";
+                }
+
+                System.out.printf("%d. %s - Key: %s%n", index++, item.getJuego().getTitulo(), key);
+            }
             carrito.cambiarEstado(EstadoCarrito.FINALIZADO);
             usuarioActual.setCarrito(null); // Vaciar carrito al finalizar la compra
 

@@ -1,4 +1,5 @@
 package mivalgamer.app;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,21 +9,33 @@ public class Videojuego {
     private final String titulo;
     private final String estudio;
     private final long idGenero;
-    private final long idPlataforma;
     private final String descripcion;
     private final double precio;
+    private final double precioOriginal;
+    private final boolean descuentoAplicado;
     private final EstadoVideojuego estado;
+    private final String icono;
+    private final String portada;
+    private final String contenidoVisual;
+    private final int stock;
 
     public Videojuego(long idVideojuego, String titulo, String estudio, long idGenero,
-                      long idPlataforma, String descripcion, double precio, EstadoVideojuego estado) {
+                      String descripcion, double precio, double precioOriginal,
+                      boolean descuentoAplicado, EstadoVideojuego estado,
+                      String icono, String portada, String contenidoVisual, int stock) {
         this.idVideojuego = idVideojuego;
         this.titulo = titulo;
         this.estudio = estudio;
         this.idGenero = idGenero;
-        this.idPlataforma = idPlataforma;
         this.descripcion = descripcion;
         this.precio = precio;
+        this.precioOriginal = precioOriginal;
+        this.descuentoAplicado = descuentoAplicado;
         this.estado = estado;
+        this.icono = icono;
+        this.portada = portada;
+        this.contenidoVisual = contenidoVisual;
+        this.stock = stock;
     }
 
     public static Videojuego fromResultSet(Connection conn, ResultSet rs) throws SQLException {
@@ -31,17 +44,21 @@ public class Videojuego {
                 rs.getString("titulo"),
                 rs.getString("estudio"),
                 rs.getLong("id_genero"),
-                rs.getLong("id_plataforma"),
                 rs.getString("descripcion"),
                 rs.getDouble("precio"),
-                EstadoVideojuego.fromString(rs.getString("estado")) // Conversión correcta
+                rs.getDouble("precio_original"),
+                rs.getBoolean("descuento_aplicado"),
+                EstadoVideojuego.fromString(rs.getString("estado")),
+                rs.getString("icono"),
+                rs.getString("portada"),
+                rs.getString("contenido_visual"),
+                rs.getInt("stock")
         );
     }
 
-
     public static List<Videojuego> obtenerTodos(Connection conn) throws SQLException {
         List<Videojuego> videojuegos = new ArrayList<>();
-        String sql = "SELECT * FROM videojuego WHERE estado = 'DISPONIBLE'";
+        String sql = "SELECT * FROM videojuego";
 
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -65,9 +82,17 @@ public class Videojuego {
         throw new SQLException("Videojuego no encontrado");
     }
 
+    /**
+     * Obtiene todos los videojuegos que están en una plataforma específica.
+     */
     public static List<Videojuego> obtenerPorPlataforma(Connection conn, long idPlataforma) throws SQLException {
         List<Videojuego> videojuegos = new ArrayList<>();
-        String sql = "SELECT * FROM videojuego WHERE id_plataforma = ? AND estado = 'DISPONIBLE'";
+        String sql = """
+            SELECT v.*
+            FROM videojuego v
+            JOIN videojuego_plataforma vp ON v.id_videojuego = vp.id_videojuego
+            WHERE vp.id_plataforma = ?
+        """;
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setLong(1, idPlataforma);
@@ -101,8 +126,20 @@ public class Videojuego {
     public String getTitulo() { return titulo; }
     public String getEstudio() { return estudio; }
     public long getIdGenero() { return idGenero; }
-    public long getIdPlataforma() { return idPlataforma; }
     public String getDescripcion() { return descripcion; }
     public double getPrecio() { return precio; }
+    public double getPrecioOriginal() { return precioOriginal; }
+    public boolean isDescuentoAplicado() { return descuentoAplicado; }
     public EstadoVideojuego getEstado() { return estado; }
+    public String getIcono() { return icono; }
+    public String getPortada() { return portada; }
+    public String getContenidoVisual() { return contenidoVisual; }
+    public int getStock() { return stock; }
+
+    /**
+     * Obtiene todas las plataformas asociadas a este videojuego (muchos a muchos).
+     */
+    public List<Plataforma> obtenerPlataformas(Connection conn) throws SQLException {
+        return Plataforma.obtenerPorVideojuego(conn, this.idVideojuego);
+    }
 }

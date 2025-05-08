@@ -2,6 +2,7 @@ package mivalgamer.app;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+
 public class Plataforma {
     private final long idPlataforma;
     private final String nombreComercial;
@@ -45,6 +46,33 @@ public class Plataforma {
             }
         }
         throw new SQLException("Plataforma no encontrada");
+    }
+
+    /**
+     * Obtiene la lista de plataformas asociadas a un videojuego (relación muchos a muchos).
+     */
+    public static List<Plataforma> obtenerPorVideojuego(Connection conn, long idVideojuego) throws SQLException {
+        List<Plataforma> plataformas = new ArrayList<>();
+        String sql = """
+            SELECT p.*
+            FROM plataforma p
+            JOIN videojuego_plataforma vp ON p.id_plataforma = vp.id_plataforma
+            WHERE vp.id_videojuego = ?
+        """;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, idVideojuego);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    plataformas.add(new Plataforma(
+                            rs.getLong("id_plataforma"),
+                            rs.getString("nombre_comercial"),
+                            rs.getString("fabricante")
+                    ));
+                }
+            }
+        }
+        return plataformas;
     }
 
     // Getters

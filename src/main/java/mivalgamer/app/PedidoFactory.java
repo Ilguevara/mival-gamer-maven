@@ -1,72 +1,61 @@
 package mivalgamer.app;
+
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PedidoFactory {
     private static final Logger LOGGER = Logger.getLogger(PedidoFactory.class.getName());
 
-    public static Pedido crearPedidoDesdeCarrito(Connection connection, List<ItemCarrito> itemsCarrito, int idMetodoPago,
-                                                 String codigoDescuento, Usuario usuario) throws SQLException {
-        // Desactivar auto-commit para usar transacciones
+    public static Pedido crearPedidoDesdeCarrito(Connection connection, List<ItemCarrito> itemsCarrito,
+                                                 int idMetodoPago, String codigoDescuento,
+                                                 Usuario usuario) throws SQLException {
         connection.setAutoCommit(false);
         try {
-            // Convertir items del carrito a items de pedido
             List<ItemPedido> itemsPedido = convertirItems(connection, itemsCarrito);
-
-            // Calcular descuento
             double descuento = calcularDescuento(connection, codigoDescuento, itemsPedido);
 
-            // Crear objeto Pedido
             Pedido pedido = new Pedido(
-                    generarIdPedido(), // Generamos un ID único
+                    generarIdPedido(),
                     usuario,
-                    LocalDateTime.now(), // Fecha actual
+                    LocalDateTime.now(),
                     idMetodoPago,
                     descuento,
-                    calcularImpuestos(connection),
+                    calcularImpuestos(),
                     EstadoPedido.PAGADO,
                     connection
             );
 
-            // Asignar items al pedido
             pedido.setItems(itemsPedido);
-
-            // Guardar en BD
             pedido.guardarEnBD();
 
-            // Marcar descuento como usado si aplica
-            if (codigoDescuento != null && !codigoDescuento.isEmpty()) {
-                marcarDescuentoUsado(connection, codigoDescuento);
-            }
+            // Procesar pago y agregar a biblioteca
+            if (pedido.procesarPago()) {
+                if (codigoDescuento != null && !codigoDescuento.isEmpty()) {
+                    marcarDescuentoUsado(connection, codigoDescuento);
+                }
+                connection.commit();
 
-            // Hacer commit a la transacción
-            connection.commit();
+                // Eliminada la línea que causaba el error:
+                // usuario.setBiblioteca(new Biblioteca(usuario, connection));
 
-            return pedido;
-        } catch (SQLException e) {
-            // Solo hacer rollback si autocommit está desactivado
-            if (!connection.getAutoCommit()) {
-                connection.rollback();
+                return pedido;
             } else {
-                LOGGER.warning("No se pudo hacer rollback porque autoCommit está en true");
+                connection.rollback();
+                throw new SQLException("El pago no pudo ser procesado");
             }
-            LOGGER.severe("Error al crear pedido: " + e.getMessage());
+        } catch (SQLException e) {
+            connection.rollback();
+            LOGGER.log(Level.SEVERE, "Error al crear pedido", e);
             throw e;
         } finally {
-            // Restaurar el auto-commit a true después de la transacción
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException e) {
-                LOGGER.severe("Mensaje de error: " + e.getMessage());
-            }
+            connection.setAutoCommit(true);
         }
     }
-
-
 
     private static String generarIdPedido() {
         return "PED-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -100,7 +89,7 @@ public class PedidoFactory {
             stmt.setString(1, codigoDescuento);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    double valor = rs.getDouble("valor"); // Cambié de 'porcentaje' a 'valor'
+                    double valor = rs.getDouble("valor");
                     String tipo = rs.getString("tipo");
                     double subtotal = items.stream()
                             .mapToDouble(ItemPedido::getSubtotal)
@@ -109,7 +98,7 @@ public class PedidoFactory {
                     if (tipo.equals("PORCENTAJE")) {
                         return subtotal * (valor / 100);
                     } else if (tipo.equals("MONTO_FIJO")) {
-                        return valor; // En este caso, se descuenta un monto fijo
+                        return valor;
                     }
                 }
             }
@@ -117,21 +106,10 @@ public class PedidoFactory {
         throw new SQLException("Código de descuento no válido o expirado");
     }
 
-    private static double calcularImpuestos(Connection conn) throws SQLException {
-        // Usamos un valor fijo para el IVA (16%) si la tabla 'configuracion' no existe
-        try {
-            String sql = "SELECT valor FROM configuracion WHERE clave = 'IVA'";
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
-                return rs.next() ? rs.getDouble("valor") / 100 : 0.19; // Retorna el valor de la tabla o 0.16 por defecto
-            }
-        } catch (SQLException e) {
-            // Si la tabla no existe, devolver un valor predeterminado
-            LOGGER.warning("Tabla 'configuracion' no encontrada. Usando valor predeterminado de 16% para IVA.");
-            return 0.16; // Valor por defecto (16%)
-        }
+    private static double calcularImpuestos() {
+        // IVA fijo del 19%
+        return 0.19;
     }
-
 
     private static void marcarDescuentoUsado(Connection conn, String codigo) throws SQLException {
         String sql = "UPDATE descuento SET es_acumulable = FALSE WHERE codigo = ?";
