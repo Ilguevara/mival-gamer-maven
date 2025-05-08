@@ -106,9 +106,23 @@ public class PedidoFactory {
         throw new SQLException("Código de descuento no válido o expirado");
     }
 
+<<<<<<< HEAD
     private static double calcularImpuestos() {
         // IVA fijo del 19%
         return 0.19;
+=======
+    private static double calcularImpuestos(Connection conn) throws SQLException {
+        try {
+            String sql = "SELECT valor FROM configuracion WHERE clave = 'IVA'";
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                return rs.next() ? rs.getDouble("valor") / 100 : 0.19;
+            }
+        } catch (SQLException e) {
+            LOGGER.warning("Tabla 'configuracion' no encontrada. Usando valor predeterminado de 16% para IVA.");
+            return 0.16;
+        }
+>>>>>>> 832a7629a1439125ab9c5211116ca639b8163bb8
     }
 
     private static void marcarDescuentoUsado(Connection conn, String codigo) throws SQLException {

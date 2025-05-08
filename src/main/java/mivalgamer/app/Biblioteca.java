@@ -144,6 +144,7 @@ public class Biblioteca {
         return items;
     }
 
+<<<<<<< HEAD
     // Devuelve los nombres de todas las plataformas asociadas a un videojuego separados por coma
     private String obtenerNombresPlataformas(Videojuego juego) {
         try {
@@ -158,17 +159,31 @@ public class Biblioteca {
             return String.join(", ", nombres);
         } catch (SQLException ex) {
             LOGGER.log(Level.SEVERE, "Error al obtener plataformas del videojuego", ex);
+=======
+    private String obtenerNombrePlataforma(long idPlataforma) {
+        String sql = "SELECT nombre_comercial FROM plataforma WHERE id_plataforma = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setLong(1, idPlataforma);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next() ? rs.getString("nombre_comercial") : "Desconocida";
+        } catch (SQLException ex) {
+            LOGGER.log(Level.SEVERE, "Error al obtener nombre de plataforma", ex);
+>>>>>>> 832a7629a1439125ab9c5211116ca639b8163bb8
             return "Desconocida";
         }
     }
 
     private Videojuego mapVideojuegoFromResultSet(ResultSet rs) throws SQLException {
+<<<<<<< HEAD
         // Se adapta a la nueva firma del constructor de Videojuego (sin idPlataforma y con los nuevos campos)
+=======
+>>>>>>> 832a7629a1439125ab9c5211116ca639b8163bb8
         return new Videojuego(
                 rs.getLong("id_videojuego"),
                 rs.getString("titulo"),
                 rs.getString("estudio"),
                 rs.getLong("id_genero"),
+<<<<<<< HEAD
                 rs.getString("descripcion"),
                 rs.getDouble("precio"),
                 rs.getDouble("precio_original"),
@@ -178,6 +193,12 @@ public class Biblioteca {
                 rs.getString("portada"),
                 rs.getString("contenido_visual"),
                 rs.getInt("stock")
+=======
+                rs.getLong("id_plataforma"),
+                rs.getString("descripcion"),
+                rs.getDouble("precio"),
+                EstadoVideojuego.fromString(rs.getString("estado"))
+>>>>>>> 832a7629a1439125ab9c5211116ca639b8163bb8
         );
     }
 

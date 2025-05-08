@@ -60,7 +60,11 @@ public class Pedido {
             System.out.println("¡Tu pedido ha sido guardado exitosamente!");
         } catch (SQLException e) {
             connection.rollback();
+<<<<<<< HEAD
             System.out.println("Ocurrió un error al guardar tu pedido. Por favor, inténtalo de nuevo.");
+=======
+            LOGGER.log(Level.SEVERE, "Error al guardar el pedido, se ha hecho rollback.", e);
+>>>>>>> 832a7629a1439125ab9c5211116ca639b8163bb8
             throw e;
         } finally {
             connection.setAutoCommit(autoCommitOriginal);
@@ -161,6 +165,7 @@ public class Pedido {
     }
 
     private String generarKeyActivacion(Videojuego juego) {
+<<<<<<< HEAD
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         int blockSize = 5;
         int blocks = 5;
@@ -177,6 +182,9 @@ public class Pedido {
             }
         }
         return keyBuilder.toString();
+=======
+        return "KEY-" + idPedido + "-" + juego.getIdVideojuego() + "-" + System.currentTimeMillis();
+>>>>>>> 832a7629a1439125ab9c5211116ca639b8163bb8
     }
 
     public List<ItemPedido> getItems() throws SQLException {
